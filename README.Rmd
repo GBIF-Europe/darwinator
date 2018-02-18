@@ -1,15 +1,32 @@
+---
+output:
+  md_document:
+    variant: markdown_github
+---
+
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-Introduction
-------------
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "README-"
+)
+```
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, comment=NA)
+```
+
+## Introduction
 
 `darwinator` is an R package that can download sampling event datasets published at GBIF.org from IPT installations.
 
-Installing from github
-----------------------
+## Installing from github
 
 If you want to install the latest version of the `darwinator` package from github, you can do it like so:
 
-``` r
+```{r message=FALSE, warning=FALSE, results="hide", eval=FALSE}
 # First make sure you have the devtools package
 # which simplifies installations from github
 # Note: Windows users have to first install Rtools to use devtools
@@ -17,16 +34,17 @@ If you want to install the latest version of the `darwinator` package from githu
 install.packages("devtools") 
 library(devtools)
 install_github("GBIF-Europe/darwinator")
+
 ```
 
-Quick start
------------
+## Quick start
 
 To see some quick usage examples to get you started, open the Vignette.
 
 Load the package in your R environment:
 
-``` r
+
+```{r message=FALSE, warning=FALSE, results="hide", eval=FALSE}
 
 library(darwinator)
 sed <- sampling_event_data("78360224-5493-45fd-a9a0-c336557f09c3")
@@ -34,11 +52,12 @@ sed <- sampling_event_data("78360224-5493-45fd-a9a0-c336557f09c3")
 df <- sed$data
 dwca <- sed$dwca
 citation <- sed$meta$citation
+
 ```
 
 Another example - get GBIF dataset identifiers for Norwegian sampling event based datasets using `rgbif`. Then download sampling event data from Norway making use of `purrr::map` and `purrr::possibly`, finally saving to disk.
 
-``` r
+```{r message=FALSE, warning=FALSE, results="hide", eval=FALSE}
 library(tidyverse)
 library(purrr)
 library(rgbif)
@@ -61,10 +80,10 @@ psed <- possibly(function(key) sampling_event_data(key), NULL)
 norway_samplingeventdata <- map(keys, psed)
 
 saveRDS(norway_samplingeventdata, "no.Rds")
+
 ```
 
-Meta
-----
+## Meta
 
--   Please [report any issues or bugs](https://github.com/GBIF-Europe/darwinator/issues).
--   License: AGPL
+* Please [report any issues or bugs](https://github.com/GBIF-Europe/darwinator/issues).
+* License: AGPL

@@ -1,0 +1,95 @@
+---
+title: "Introduction to Darwinator"
+author: "Markus Skyttner"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to Darwinator}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Getting Sample Event Based datasets from GBIF
+
+First search for sampling event datasets from Norway using `rgbif`:
+
+```{r, message=FALSE}
+
+library(rgbif)
+library(tidyverse)
+
+search <-
+  rgbif::dataset_search(
+    type = "SAMPLING_EVENT",
+    publishingCountry = "NO"
+  )
+```
+
+Lets quickly list the first 5 search hits:
+
+```{r}
+knitr::kable(
+  search$data %>% 
+    head(5) %>% 
+    select(datasetTitle, publishingOrganization, datasetKey)
+  )
+
+```
+
+Now we retrieve specific keys/identifiers for a specific relevant dataset, lets say we want datasets with a title that contains the string "Lepidurus":
+
+```{r}
+
+key <-
+  search$data %>%
+  filter(grepl("Lepidurus", datasetTitle)) %>%
+  .$datasetKey
+
+key
+
+```
+
+This is the dataset we're interested in. Now we retrieve the sampling event data for that specific dataset identifier:
+
+```{r}
+library(darwinator)
+
+sed <- sampling_event_data(key)
+
+# we now have a suggested citation to use 
+citation <- sed$meta$citation
+
+citation
+```
+
+We can display the individual sampling event tables and the combined data from those tables too:
+
+```{r}
+library(DT)
+
+# the sample event data tables
+event_core <- sed$dwca$event_core
+occ_ext <- sed$dwca$occurrence_ext
+mof <- sed$dwca$measurementorfact
+
+datatable(event_core %>% head(5))
+datatable(occ_ext %>% head(5))
+datatable(mof %>% head(5))
+
+```
+
+This is the combined data:
+
+```{r}
+# we have the data available for use and the metadata
+metadata <- sed$meta
+data <- sed$data
+
+# display first 5 rows of data
+datatable(
+  data %>% 
+  head(5)
+)
+
+```
+
