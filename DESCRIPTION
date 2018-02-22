@@ -8,7 +8,7 @@ Author: Nordic Oikos 2018
 Maintainer: Markus Skyttner <markus.skyttner@nrm.se>
 Authors@R: person("Markus", "Skyttner", role = c("cre", "aut"), email = "markus.skyttner@nrm.se")
 URL: https://github.com/GBIF-Europe/darwinator
-BugReports: https://github.com/GBIF-Europe/darwinator
+BugReports: https://github.com/GBIF-Europe/darwinator/issues
 License: file LICENSE
 Encoding: UTF-8
 LazyData: true
