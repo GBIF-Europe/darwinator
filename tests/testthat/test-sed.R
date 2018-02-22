@@ -1,6 +1,9 @@
+library(darwinator)
+
 context("sampling event data tests for a couple of datasets")
 
 test_that("citation is correct", {
+  skip_on_travis()
   key <- "78360224-5493-45fd-a9a0-c336557f09c3"
   expect_equal(
     sampling_event_data(key)$meta$citation,
@@ -9,6 +12,7 @@ test_that("citation is correct", {
 })
 
 test_that("31 rows of data ", {
+  skip_on_travis()
   key <- "78360224-5493-45fd-a9a0-c336557f09c3"
   df <- sampling_event_data(key)
   expect_equal(
@@ -18,6 +22,7 @@ test_that("31 rows of data ", {
 })
 
 test_that("a sampling dataset without MOF table works", {
+  skip_on_travis()
   key <- "c47f13c1-7427-45a0-9f12-237aad351040"
   expect_gt(
     nrow(sampling_event_data(key)$data),
@@ -26,6 +31,7 @@ test_that("a sampling dataset without MOF table works", {
 })
 
 test_that("parsing errors are found", {
+  skip_on_travis()
   library(purrr)
   test_pe_keys <- c(
     "9c689543-6bf1-42e1-b280-b61d739e18c3",
@@ -33,7 +39,7 @@ test_that("parsing errors are found", {
   #  "33591b80-0e31-480c-82ce-2f57211b10e6",
     "57d403f4-9d00-4651-8e26-1f4e81a21181"
   )
-  pe <- map(test_pe_keys, sampling_event_data)
+  pe <- suppressWarnings(map(test_pe_keys, sampling_event_data))
   issues <- map_df(pe, c("dwca", "parsing_issues"))
   expect_lt(1, nrow(issues))
 })
