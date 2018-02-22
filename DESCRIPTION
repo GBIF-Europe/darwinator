@@ -3,7 +3,7 @@ Type: Package
 Title: Darwin Core Archive Tools For Sampling Event Data
 Description: This package allows reading DwcA (Darwin Core Archive) files directly from GBIF IPT nodes.
     It will have functions in the future also for writing or generating DwcA files for Sampling Event data (embedding metadata, event core data, occurrence extension data and measurement or facts data into the archive).
-Version: 0.1.0
+Version: 0.1.1
 Author: Nordic Oikos 2018
 Maintainer: Markus Skyttner <markus.skyttner@nrm.se>
 Authors@R: person("Markus", "Skyttner", role = c("cre", "aut"), email = "markus.skyttner@nrm.se")
@@ -18,11 +18,11 @@ Imports: tidyverse,
     jsonlite,
     readr,
     tibble,
-    xml2
+    xml2, 
+    rgbif,
+    purrr
 Suggests: knitr,
     rmarkdown,
-    testthat, 
-    rgbif,
-    DT
+    testthat
 VignetteBuilder: knitr
 RoxygenNote: 6.0.1

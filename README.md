@@ -1,4 +1,6 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+[![Build Status](https://travis-ci.org/GBIF-Europe/darwinator.svg?branch=master)](https://travis-ci.org/GBIF-Europe/darwinator)
+
 Introduction
 ------------
 
@@ -36,35 +38,46 @@ dwca <- sed$dwca
 citation <- sed$meta$citation
 ```
 
-Another example - get GBIF dataset identifiers for Norwegian sampling event based datasets using `rgbif`. Then download sampling event data from Norway making use of `purrr::map` and `purrr::possibly`, finally saving to disk.
+Another example - get all GBIF dataset identifiers for Norwegian sampling event based datasets using `rgbif`. Then download all sampling event data from Norway saving it locally to enable off-line work.
 
 ``` r
 library(tidyverse)
-library(purrr)
 library(rgbif)
 library(darwinator)
 
+# make a search for all Norwegian sampling event dataset identfiers
 search <-
   dataset_search(
-    query = "*",
     type = "SAMPLING_EVENT",
     publishingCountry = "NO"
   )
-
 keys <- search$data$datasetKey
 
 # use dplyr::possibly to wrap the sampling_event_data function
 # so that it returns NULL if it fails on a particular dataset
-
+library(purrr)
 psed <- possibly(function(key) sampling_event_data(key), NULL)
+norway <- map(keys, psed)
 
-norway_samplingeventdata <- map(keys, psed)
+# exclude failed requests
+fails <- unlist(map(norway, is.null))
+failed_keys <- keys[fails]
+successful_downloads <- norway[!fails]
 
-saveRDS(norway_samplingeventdata, "no.Rds")
+# save all successful downloads
+saveRDS(dl_success, "norway-sed.Rds")
+
+# a report of parsing issues can be generated like this:
+parsing_issues <- map_df(successful_downloads, c("dwca", "parsing_issues"))
+readr::write_excel_csv(issues_norway, "issues-norway.csv")
 ```
+
+For more usage examples, please see the vignette.
 
 Meta
 ----
+
+Please note that this project is released with a [Contributor Code of Conduct](CONDUCT.md). By participating in this project you agree to abide by its terms.
 
 -   Please [report any issues or bugs](https://github.com/GBIF-Europe/darwinator/issues).
 -   License: AGPL

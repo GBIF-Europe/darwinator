@@ -10,50 +10,96 @@ dataset_details <- function(key) {
 }
 
 # download and parse sample event data from DwcA-file
-dl_dwca <- function(url) {
-
-  dwca_file <- tempfile(fileext = ".zip")
+dwca_download <- function(url) {
+  dwca_file <- tempfile(pattern = "sampling-event-dwca-", fileext = ".zip")
   dwca_dir <- dirname(dwca_file)
-  download.file(url, destfile = dwca_file, mode = "wb", quiet = TRUE)
-  unzip(dwca_file, exdir = dwca_dir)
+  if (download.file(url, destfile = dwca_file, mode = "wb", quiet = TRUE) != 0)
+    stop("External error downloading from ", url)
+  return (dwca_file)
+}
 
-  event_file <- file.path(dwca_dir, "event.txt")
-  occ_file <- file.path(dwca_dir, "occurrence.txt")
-  mof_file <- file.path(dwca_dir, "measurementorfact.txt")
+dwca_parse <- function(dwca_file) {
 
-  occurrence_ext <-
-    suppressMessages(readr::read_tsv(occ_file)) %>%
-    select(-id)
+  # TODO use library(finch) in the next iteration
 
-  event_core <- NULL
-  mof <- NULL
+  stopifnot(file.exists(dwca_file), tools::file_ext(dwca_file) == "zip")
+  filez <- unzip(dwca_file, list = TRUE, junkpaths = TRUE)$Name
+  meta <- eml <- event_core <- occurrence_ext <- mof <- issues <- NULL
 
-  if (file.exists(event_file)) {
-    event_core <-
-      suppressMessages(readr::read_tsv(event_file)) %>%
-      select(-id)
+  if ("meta.xml" %in% filez) {
+    # TODO parse meta.xml for encoding, field/line terminators,
+    # quoting char, skiplines etc and use this in further parsing
+    meta <- xml2::read_xml(unz(dwca_file, "meta.xml")) %>%
+      xml2::as_list()
   } else {
-    warning("No event_core table found in ", url)
+    warning("No meta.xml found in ", dwca_file)
   }
-  if (file.exists(mof_file)) {
-    mof <-
-      suppressMessages(readr::read_tsv(mof_file)) %>%
-      rename(eventID = id)
+
+  if ("eml.xml" %in% tolower(filez)) {
+    eml <- xml2::read_xml(unz(dwca_file, "eml.xml")) %>%
+      xml2::as_list()
   } else {
-    message("No 'measurement or facts' found in ", url)
+    warning("No eml.xml found in ", dwca_file)
+  }
+
+  if ("event.txt" %in% filez) {
+    event_core <- suppressWarnings(
+      suppressMessages(readr::read_tsv(unz(dwca_file, "event.txt"))) %>%
+      select(-id))
+  } else {
+    warning("No event_core table found in ", dwca_file)
+  }
+
+  if ("occurrence.txt" %in% filez) {
+    occurrence_ext <- suppressWarnings(
+      suppressMessages(readr::read_tsv(unz(dwca_file, "occurrence.txt"))) %>%
+      select(-id))
+  } else {
+    message("No occurrence extension table found in ", dwca_file)
+  }
+
+  if ("measurementorfact.txt" %in% filez) {
+    mof <- suppressWarnings(
+      suppressMessages(readr::read_tsv(unz(dwca_file, "measurementorfact.txt"))) %>%
+      rename(eventID = id))
+  } else {
+    message("No 'measurement or facts' found in ", dwca_file)
   }
 
   res <- list(
-    event_core = event_core,
-    occurrence_ext = occurrence_ext,
-    measurementorfact = mof
+    "event_core" = as_tibble(event_core),
+    "occurrence_ext" = as_tibble(occurrence_ext),
+    "measurementorfact" = as_tibble(mof)
   )
+
+  n_probs <- function(x) {
+    probs <- attr(suppressWarnings(x), "problems")
+    if (is.null(probs))
+        0
+    else nrow(probs)
+  }
+
+  tables_with_probs <- purrr::map_lgl(res,
+    function(x) n_probs(x) > 0
+  )
+
+  if (any(tables_with_probs)) {
+    res$has_parsing_issues <- TRUE
+    res$parsing_issues <- purrr::map(res[tables_with_probs], readr::problems) %>%
+      bind_rows(.id = "table")
+    res$parsing_issues$file <- dwca_file
+    warning("Found parsing issues in ", dwca_file,
+      ", details are in result$parsing_issues", "\n")
+  } else {
+    res$parsing_issues <- NULL
+    res$has_parsing_issues <- FALSE
+  }
 
   return (res)
 }
 
 # get EML at IPT and generate suitable citation
-dl_eml <- function(url) {
+eml_download <- function(url) {
   tmp <- tempfile()
   download.file(url = url, destfile = tmp, quiet = TRUE)
   meta <- xml2::read_xml(tmp) %>% xml2::as_list()
@@ -94,26 +140,39 @@ sampling_event_data <- function(key) {
     filter(type == "DWC_ARCHIVE") %>%
     .$url
 
-  dwca <- dl_dwca(url_dwca)
+  dwca_file <- dwca_download(url_dwca)
+  dwca <- dwca_parse(dwca_file)
+  unlink(dwca_file)
 
   url_eml <-
     dataset_details(key)$endpoints %>%
     filter(type == "EML") %>%
     .$url
 
-  eml <- dl_eml(url_eml)
+  eml <- eml_download(url_eml)
 
-  df <-
-    dwca$event_core %>%
-    left_join(dwca$occurrence_ext, by = "eventID")
+  df <- dwca$event_core
 
-  if (!is.null(dwca$mof)) {
-    mof_wide <-
-      dwca$measurementorfact %>%
-      select(eventID, measurementValue, measurementType) %>%
-      spread(key = measurementType, value = measurementValue)
-    df <- df %>% left_join(mof_wide, by = "eventID")
+  if (nrow(dwca$occurrence_ext) > 0) {
+    if ("eventID" %in% names(dwca$occurrence_ext)) {
+      df <- df %>% left_join(dwca$occurrence_ext, by = "eventID")
+    } else {
+      warning("occurrence extension table lacks eventID for key ", key)
+    }
+  }
 
+  if (nrow(dwca$measurementorfact) > 0) {
+    if (all(c("eventID", "measurementValue", "measurementType") %in%
+        names(dwca$measurementorfact))) {
+      mof_wide <-
+        dwca$measurementorfact %>%
+          select(eventID, measurementValue, measurementType, -contains("measurementID")) %>%
+          spread(key = measurementType, value = measurementValue)
+      df <- df %>% left_join(mof_wide, by = "eventID")
+    } else {
+      warning("measurementorfacts table lacks eventID, ",
+        "measurementValue or measurementType for key ", key)
+    }
   }
 
   res <- list(

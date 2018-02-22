@@ -1,4 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 .travis.yml
-dev.R
+^data-raw$
+^CONDUCT\.md$

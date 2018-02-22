@@ -1,6 +1,5 @@
 ---
 title: "Introduction to Darwinator"
-author: "Markus Skyttner"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -23,6 +22,7 @@ search <-
     type = "SAMPLING_EVENT",
     publishingCountry = "NO"
   )
+
 ```
 
 Lets quickly list the first 5 search hits:
@@ -36,7 +36,9 @@ knitr::kable(
 
 ```
 
-Now we retrieve specific keys/identifiers for a specific relevant dataset, lets say we want datasets with a title that contains the string "Lepidurus":
+There is a total of `r nrow(search)` datasets available with sampling event data from Norway. 
+
+Now we show how to make a search to retrieve specific keys/identifiers for a specific relevant dataset, lets say we want datasets with a title that contains the string "Lepidurus":
 
 ```{r}
 
@@ -49,7 +51,7 @@ key
 
 ```
 
-This is the dataset we're interested in. Now we retrieve the sampling event data for that specific dataset identifier:
+This is the dataset we're interested in. We now retrieve the sampling event data for that single specific dataset identifier:
 
 ```{r}
 library(darwinator)
@@ -62,34 +64,166 @@ citation <- sed$meta$citation
 citation
 ```
 
-We can display the individual sampling event tables and the combined data from those tables too:
+We can display a row from each of the individual sampling event tables:
 
 ```{r}
-library(DT)
 
 # the sample event data tables
 event_core <- sed$dwca$event_core
 occ_ext <- sed$dwca$occurrence_ext
 mof <- sed$dwca$measurementorfact
 
-datatable(event_core %>% head(5))
-datatable(occ_ext %>% head(5))
-datatable(mof %>% head(5))
+knitr::kable(event_core %>% head(1) %>% t())
+knitr::kable(occ_ext %>% head(1) %>% t())
+knitr::kable(mof %>% head(1) %>% t())
 
 ```
 
-This is the combined data:
+This is what a row from the combined data from those tables can look like:
 
 ```{r}
 # we have the data available for use and the metadata
 metadata <- sed$meta
 data <- sed$data
 
-# display first 5 rows of data
-datatable(
-  data %>% 
-  head(5)
+# display first row of data
+knitr::kable(
+  data %>% head(1) %>% t()
 )
 
+```
+
+This snippet shows how to download all sampling event datasets from Norway and persist DwcA files locally on disk to enable working with these off-line:
+
+```{r eval=FALSE}
+library(rgbif)
+library(purrr)
+library(dplyr)
+library(darwinator)
+
+# make a search using rgbif for:
+# all Norwegian sampling event dataset identfiers
+
+search <-
+  dataset_search(
+    type = "SAMPLING_EVENT",
+    publishingCountry = "NO"
+  )
+
+norway_keys <- search$data$datasetKey
+
+# function to extract IPT endpoint url for a specific dataset key
+
+ipt_endpoints <- function(key) {
+  tibble(
+    key = key,
+    url = darwinator:::dataset_details(key)$endpoints$url
+  )
+}
+
+# then iterate over all the norwegian IPT endpoint URLs
+# restrict IPT urls to DWC_ARCHIVE files only
+
+norway_ipt_urls <- map_df(norway_keys, ipt_endpoints)
+
+ipt_urls_dwca <-
+  norway_ipt_urls %>%
+  mutate(is_dwca = grepl("archive.do", url)) %>%
+  filter(is_dwca) %>%
+  .$url
+
+# finally the download - iterate over all those and download
+# then return the names of those tempfiles (DwcA-zip-files)
+filez <- map_chr(ipt_urls_dwca, darwinator:::dwca_download)
+tibble(filez, ipt_urls_dwca)
+
+```
+
+We may now be interested in reporting a few findings - for example are there any IPT URL endpoints that risk being blocked by extra strict firewalls? And those that are served without using HTTPS?
+
+```{r eval=FALSE}
+# find all URLs with a port specified (such as :8080)
+# by using a regexp for a : followed by one or more digits
+
+has_port <- function(x) grepl(":\\d+", x)
+has_https <- function(x) grepl("https://", x)
+is_dwca <- function(x) grepl("archive.do", x)
+
+potentially_firewalled_datasets <-
+  norway_ipt_urls %>%
+  mutate(firewalled = has_port(url)) %>%
+  filter(firewalled) %>%
+  select(url)
+
+# networks that block everything but 80 and 443 (http and https)
+# may restrict access to these IPT endpoint URLs
+message("Extra strict firewalls may block these URLs:")
+potentially_firewalled_datasets
+
+# non-https IPT endpoint URLs
+non_https_datasets <- 
+  norway_ipt_urls %>%
+  mutate(is_not_https = !has_https(url)) %>%
+  mutate(is_dwca = is_dwca(url)) %>%
+  filter(is_not_https, is_dwca) %>%
+  select(url)
+
+message("These IPT urls are not served using https:")
+non_https_datasets
+
+  
+```
+
+For reporting parsing issues, this snippet can be used:
+
+```{r eval=FALSE}
+
+# test parsing of each and every one... in order 
+# to see if there are any parsing issues
+res <- map(filez, darwinator:::dwca_parse)
+
+# for those with parsing issues, show those in a report
+issues_index <- unlist(map(res, "has_parsing_issues"))
+issues <- map_df(res[issues_index], "parsing_issues")
+report <-
+  tibble(url = ipt_urls_dwca[issues_index], file = filez[issues_index]) %>%
+  left_join(issues, by = "file") %>%
+  select(-file, -url, everything(), url)
+
+knitr::kable(report)
+
+#if (!dir.exists("data-raw")) dir.create("data-raw")
+#readr::write_excel_csv(report, "data-raw/issues-norway.csv")
+
+```
+
+Here is how to download and parse all Norwegian sampling event datasets in one go - as of 2018-02-22 this resulted in a large list of 30 elements, 718 Mb:
+
+```{r eval=FALSE}
+
+# use dplyr::possibly to wrap the sampling_event_data function
+# so that it returns NULL if it fails on a particular dataset
+library(purrr)
+psed <- possibly(function(key) sampling_event_data(key), NULL)
+norway <- map(norway_keys, psed)
+
+# exclude failed requests
+fails <- unlist(map(norway, is.null))
+failed_keys <- norway_keys[fails]
+successful_downloads <- norway[!fails]
+
+# persist this on disk as an R object so it can be
+# loaded again off-line using readRDS()
+#saveRDS(successful_downloads, "data-raw/norway-sed.Rds")
+
+
+
+```
+
+A report of parsing issues can be generated like this:
+
+```{r eval=FALSE}
+parsing_issues <- map_df(successful_downloads, c("dwca", "parsing_issues"))
+readr::write_excel_csv(issues_norway, "data-raw/issues-norway.csv")
 ```
 

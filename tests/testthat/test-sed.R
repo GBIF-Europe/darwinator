@@ -10,6 +10,7 @@ test_that("citation is correct", {
 
 test_that("31 rows of data ", {
   key <- "78360224-5493-45fd-a9a0-c336557f09c3"
+  df <- sampling_event_data(key)
   expect_equal(
     nrow(sampling_event_data(key)$data),
     31
@@ -23,3 +24,17 @@ test_that("a sampling dataset without MOF table works", {
     0
   )
 })
+
+test_that("parsing errors are found", {
+  library(purrr)
+  test_pe_keys <- c(
+    "9c689543-6bf1-42e1-b280-b61d739e18c3",
+  #  "a855a639-cccb-4286-af92-f7567d74a887",
+  #  "33591b80-0e31-480c-82ce-2f57211b10e6",
+    "57d403f4-9d00-4651-8e26-1f4e81a21181"
+  )
+  pe <- map(test_pe_keys, sampling_event_data)
+  issues <- map_df(pe, c("dwca", "parsing_issues"))
+  expect_lt(1, nrow(issues))
+})
+
