@@ -100,15 +100,23 @@ dwca_parse <- function(dwca_file) {
 
 # get EML at IPT and generate suitable citation
 eml_download <- function(url) {
-  tmp <- tempfile()
-  download.file(url = url, destfile = tmp, quiet = TRUE)
-  meta <- xml2::read_xml(tmp) %>% xml2::as_list()
-  gbif_citation <- meta$additionalMetadata$metadata$gbif$citation[[1]]
+  tmp <- tempfile(pattern = "sampling-event-eml-", fileext = ".xml")
+  if (download.file(url = url, destfile = tmp, quiet = TRUE, mode = "wb") != 0)
+    stop("External error downloading EML from ", url)
+  meta <- xml2::read_xml(tmp)
+
+  gbif_citation <-
+    meta %>%
+    xml2::xml_find_first(xpath = "//citation") %>%
+    xml2::xml_text()
+
   citation <- gsub("GBIF.org", paste(url), gbif_citation)
+
   res <- list(
     eml = meta,
     citation = citation
   )
+
   return (res)
 }
 

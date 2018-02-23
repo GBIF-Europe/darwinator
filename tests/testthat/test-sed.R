@@ -5,8 +5,9 @@ context("sampling event data tests for a couple of datasets")
 test_that("citation is correct", {
   skip_on_travis()
   key <- "78360224-5493-45fd-a9a0-c336557f09c3"
+  citation <- sampling_event_data(key)$meta$citation
   expect_equal(
-    sampling_event_data(key)$meta$citation,
+    citation,
     "Finstad A G, Hendrichsen D K, Nilsen E (2015): Lepidurus arcticus survey Northeast Greenland 2013. v1.8. NTNU University Museum. Dataset/Samplingevent. http://gbif.vm.ntnu.no/ipt/resource?r=lepidurus-arcticus-survey_northeast-greenland_2013&v=1.8"
   )
 })
@@ -42,5 +43,18 @@ test_that("parsing errors are found", {
   pe <- suppressWarnings(map(test_pe_keys, sampling_event_data))
   issues <- map_df(pe, c("dwca", "parsing_issues"))
   expect_lt(1, nrow(issues))
+})
+
+test_that("citation EML from IPT can be parsed", {
+  skip_on_travis()
+  #key <- "78360224-5493-45fd-a9a0-c336557f09c3"
+  ipt_url <- paste0("https://gbif.vm.ntnu.no/ipt/eml.do",
+    "?r=lepidurus-arcticus-survey_northeast-greenland_2013")
+  eml <- darwinator:::eml_download(ipt_url)
+  citation <- eml$citation
+  expect_equal(
+    citation,
+    "Finstad A G, Hendrichsen D K, Nilsen E (2015): Lepidurus arcticus survey Northeast Greenland 2013. v1.8. NTNU University Museum. Dataset/Samplingevent. http://gbif.vm.ntnu.no/ipt/resource?r=lepidurus-arcticus-survey_northeast-greenland_2013&v=1.8"
+  )
 })
 

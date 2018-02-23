@@ -17,8 +17,10 @@ If you want to install the latest version of the `darwinator` package from githu
 # Note: Windows users have to first install Rtools to use devtools
 
 install.packages("devtools") 
-library(devtools)
-install_github("GBIF-Europe/darwinator")
+devtools::install_github("GBIF-Europe/darwinator")
+
+# install a specific released version:
+# devtools::install_github("GBIF-Europe/darwinator@v0.1.1")
 ```
 
 Quick start
@@ -36,6 +38,17 @@ sed <- sampling_event_data("78360224-5493-45fd-a9a0-c336557f09c3")
 df <- sed$data
 dwca <- sed$dwca
 citation <- sed$meta$citation
+```
+
+The package bundles a dataset with recommended Darwin Core terms. The labels for the Darwin Core terms can for example be used for validating column names in sampling event datasets. The terms data can be accessed like so:
+
+``` r
+
+library(darwinator)
+dwc_terms
+
+# read documentation for the dataset
+?dwc_terms
 ```
 
 Another example - get all GBIF dataset identifiers for Norwegian sampling event based datasets using `rgbif`. Then download all sampling event data from Norway saving it locally to enable off-line work.

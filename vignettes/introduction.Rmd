@@ -8,24 +8,46 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-## Getting Sample Event Based datasets from GBIF
+## Working with Sampling Event Based Datasets from GBIF
 
-First search for sampling event datasets from Norway using `rgbif`:
+Sampling event based datasets at GBIF are available in Darwin Core Archive files - zipped CSV files with metadata. 
+
+These files use Darwin Core simple terms. The `darwinator` package bundles a dataset with those recommended Darwin Core terms. 
+
+The labels for these Darwin Core terms can for example be used for validating column names in sampling event datasets. The simple Darwin Core terms data can be accessed like so:
+
+```{r, message=FALSE}
+
+library(darwinator)
+
+# read the documentation for the dataset
+?dwc_terms
+
+# display the first row of the recommended simple Darwin Core terms dataset
+library(dplyr)
+simple_terms <- dwc_terms %>% filter(is_simple)
+knitr::kable(simple_terms %>% head(1) %>% t())
+
+```
+
+To get a DwcA file from GBIF, a dataset identifier key is needed. To get all such keys for sampling event datasets published at gbif.org from Norway, first search for the keys using `rgbif`:
 
 ```{r, message=FALSE}
 
 library(rgbif)
 library(tidyverse)
-
+ 
 search <-
-  rgbif::dataset_search(
+ dataset_search(
     type = "SAMPLING_EVENT",
     publishingCountry = "NO"
   )
 
+message("Search hit count: ", search$count)
+
 ```
 
-Lets quickly list the first 5 search hits:
+Lets quickly list the first 5 search hits out of the total of `r search$count` hits:
 
 ```{r}
 knitr::kable(
@@ -36,7 +58,7 @@ knitr::kable(
 
 ```
 
-There is a total of `r nrow(search)` datasets available with sampling event data from Norway. 
+There are several datasets available with sampling event data from Norway. 
 
 Now we show how to make a search to retrieve specific keys/identifiers for a specific relevant dataset, lets say we want datasets with a title that contains the string "Lepidurus":
 
@@ -197,7 +219,7 @@ knitr::kable(report)
 
 ```
 
-Here is how to download and parse all Norwegian sampling event datasets in one go - as of 2018-02-22 this resulted in a large list of 30 elements, 718 Mb:
+Here is how to download and parse all Norwegian sampling event datasets in one go - as of 2018-02-22 this resulted in a large list of approx 30 elements, 718 Mb:
 
 ```{r eval=FALSE}
 
